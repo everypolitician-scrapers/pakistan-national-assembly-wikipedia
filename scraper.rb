@@ -19,24 +19,11 @@ class MemberList < Scraped::HTML
     member_rows.map { |tr| fragment(tr => MemberRow).to_h }
   end
 
-  field :parties do
-    wanted_cells = [1, 4]
-    party_rows.flat_map do |tr|
-      wanted_cells.map { |id| tr.css('td')[id] }.compact.map do |td|
-        fragment(td.css('a') => PartyLink).to_h
-      end
-    end
+  def parties
+    @parties ||= members.reject { |m| m[:party_id].nil? }.map { |m| [ m[:party], m[:party_id] ] }.to_h
   end
 
   private
-
-  def parties_table
-    noko.css('table.floatright')
-  end
-
-  def party_rows
-    parties_table.xpath('.//tr').drop(2)
-  end
 
   def members_table
     noko.xpath('//h2[span[@id="Members"]]/following-sibling::table[1]')
@@ -45,21 +32,6 @@ class MemberList < Scraped::HTML
   def member_rows
     # all rows with a link in the 4th column
     members_table.xpath('.//tr[td[4][a]]')
-  end
-end
-
-class PartyLink < Scraped::HTML
-  field :id do
-    noko.attr('wikidata').text
-  end
-
-  field :shortname do
-    noko.text.tidy
-  end
-
-  field :name do
-    return 'Independent' if shortname.include? 'Independent'
-    noko.attr('title').text
   end
 end
 
@@ -82,6 +54,10 @@ class MemberRow < Scraped::HTML
 
   field :region do
     noko.at_css('th').text
+  end
+
+  field :party_id do
+    td[2].css('a/@wikidata').map(&:text).first
   end
 
   field :party do
@@ -112,12 +88,12 @@ class MemberRow < Scraped::HTML
 end
 
 url = 'https://en.wikipedia.org/wiki/List_of_members_of_the_14th_National_Assembly_of_Pakistan'
+
 page = scraped(url => MemberList)
-parties = page.parties
 data = page.members.each do |mem|
-  mem[:party_id] = parties.find { |p| p[:name] == mem[:party] }[:id] rescue binding.pry
+  mem[:party_id] ||= page.parties[mem[:party]]
 end
 data.each { |mem| puts mem.reject { |_, v| v.to_s.empty? }.sort_by { |k, _| k }.to_h } if ENV['MORPH_DEBUG']
 
 ScraperWiki.sqliteexecute('DROP TABLE data') rescue nil
-ScraperWiki.save_sqlite(%i[id constituency_id], data)
+ScraperWiki.save_sqlite(%i[id area], data)
