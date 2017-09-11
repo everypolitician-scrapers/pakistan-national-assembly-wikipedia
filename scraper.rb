@@ -30,8 +30,8 @@ class MemberList < Scraped::HTML
   end
 
   def member_rows
-    # all rows with a link in the 4th column
-    members_table.xpath('.//tr[td[4][a]]')
+    # all rows with a link in the 3rd column
+    members_table.xpath('.//tr[td[3][a]]')
   end
 end
 
@@ -57,15 +57,15 @@ class MemberRow < Scraped::HTML
   end
 
   field :party_id do
-    td[2].css('a/@wikidata').map(&:text).first
+    td[1].css('a/@wikidata').map(&:text).first
   end
 
   field :party do
-    td[2].text.tidy
+    td[1].text.tidy
   end
 
   field :start_date do
-    Date.parse(td[4].text.tidy).to_s rescue binding.pry
+    Date.parse(td[3].text.tidy).to_s rescue binding.pry
   end
 
   private
@@ -75,15 +75,15 @@ class MemberRow < Scraped::HTML
   end
 
   def member
-    td[3].css('a').first
+    td[2].css('a').first
   end
 
   def constituency_link
-    td[1].css('a').first
+    td[0].css('a').first
   end
 
   def constituency
-    td[1]
+    td[0]
   end
 end
 
